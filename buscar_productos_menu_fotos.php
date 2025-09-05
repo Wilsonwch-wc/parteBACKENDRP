@@ -37,15 +37,24 @@ while($row = $result->fetch_assoc()) {
                         foreach($imagenes as $index => $imagen) {
                             ?>
                             <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>">
-                                <img src="<?php echo $imagen; ?>" class="d-block w-100" 
-                                     style="height: 300px; object-fit: cover;" alt="<?php echo $row['nombre']; ?>">
+                                <img src="<?php echo $imagen; ?>" class="d-block w-100 img-fluid" 
+                                     style="height: 300px; object-fit: cover; cursor: pointer;" 
+                                     alt="<?php echo $row['nombre']; ?>"
+                                     onclick='agregarAlCarrito({
+                                         "id": <?php echo $row["id"]; ?>,
+                                         "codigo": "<?php echo addslashes($row["codigo"]); ?>",
+                                         "nombre": "<?php echo addslashes($row["nombre"]); ?>",
+                                         "precio": <?php echo floatval($row["precio"]); ?>,
+                                         "stock": <?php echo intval($row["stock"]); ?>
+                                     })'>
                             </div>
                             <?php
                         }
                     } else {
+                        // Imagen por defecto si no hay imágenes
                         ?>
                         <div class="carousel-item active">
-                            <img src="https://via.placeholder.com/400x300" class="d-block w-100" 
+                            <img src="https://via.placeholder.com/400x300" class="d-block w-100 img-fluid" 
                                  style="height: 300px; object-fit: cover;" alt="Sin imagen">
                         </div>
                         <?php

@@ -110,7 +110,7 @@
                     <thead class="table-dark">
                         <tr>
                             <th>Fecha</th>
-                            <th>Pedido #</th>
+                            <th>N° Pedido</th>
                             <th>Productos</th>
                             <th>Cantidad</th>
                             <th>Total</th>

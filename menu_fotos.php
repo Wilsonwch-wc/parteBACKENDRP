@@ -12,13 +12,67 @@ if (!$conn) {
 
 <div class="container mt-4">
     <div class="row">
+        <!-- Carrito de compras - Ahora primero en móvil -->
+        <div class="col-md-5 order-1 order-md-2 mb-4">
+            <div class="card sticky-top" style="top: 1rem;">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Lista de Compras</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 15%">Código</th>
+                                    <th style="width: 35%">Producto</th>
+                                    <th style="width: 15%">Cant.</th>
+                                    <th style="width: 15%">P.U.</th>
+                                    <th style="width: 15%">Total</th>
+                                    <th style="width: 5%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="carritoItems">
+                                <!-- Los items se agregarán aquí dinámicamente -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2">Total Items:</td>
+                                    <td id="totalItems">0</td>
+                                    <td>Total:</td>
+                                    <td colspan="2" id="totalPrecio">$0.00</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4">Total con IVA (21%):</td>
+                                    <td colspan="2" id="totalConIVA">$0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="incluirIVA" onchange="actualizarCarritoUI()">
+                        <label class="form-check-label" for="incluirIVA">
+                            Incluir IVA (21%)
+                        </label>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success" onclick="procesarVenta()">
+                            Procesar Venta
+                        </button>
+                        <button class="btn btn-danger" onclick="limpiarCarrito()">
+                            Limpiar Lista
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Buscador -->
-        <div class="col-12 mb-4">
+        <div class="col-12 order-2 order-md-1 mb-4">
             <input type="text" id="buscador" class="form-control" placeholder="Buscar por nombre, código, etc.">
         </div>
         
         <!-- Lista de productos -->
-        <div class="col-md-7">
+        <div class="col-md-7 order-3 order-md-1">
             <h2 class="mb-4">Catálogo de Productos</h2>
             <div class="row row-cols-1 row-cols-md-3 g-4" id="productosGrid">
                 <?php
@@ -120,60 +174,6 @@ if (!$conn) {
                     echo '<div class="col-12"><div class="alert alert-info">No hay productos disponibles.</div></div>';
                 }
                 ?>
-            </div>
-        </div>
-        
-        <!-- Carrito de compras -->
-        <div class="col-md-5">
-            <div class="card sticky-top" style="top: 1rem;">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Lista de Compras</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th style="width: 15%">Código</th>
-                                    <th style="width: 35%">Producto</th>
-                                    <th style="width: 15%">Cant.</th>
-                                    <th style="width: 15%">P.U.</th>
-                                    <th style="width: 15%">Total</th>
-                                    <th style="width: 5%"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="carritoItems">
-                                <!-- Los items se agregarán aquí dinámicamente -->
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="2">Total Items:</td>
-                                    <td id="totalItems">0</td>
-                                    <td>Total:</td>
-                                    <td colspan="2" id="totalPrecio">$0.00</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="4">Total con IVA (21%):</td>
-                                    <td colspan="2" id="totalConIVA">$0.00</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="incluirIVA" onchange="actualizarCarritoUI()">
-                        <label class="form-check-label" for="incluirIVA">
-                            Incluir IVA (21%)
-                        </label>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-success" onclick="procesarVenta()">
-                            Procesar Venta
-                        </button>
-                        <button class="btn btn-danger" onclick="limpiarCarrito()">
-                            Limpiar Lista
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>

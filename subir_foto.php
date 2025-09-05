@@ -1,6 +1,12 @@
 <?php
 require_once 'db.php';
-checkPermission();
+
+// Verificar permisos
+if (!isLoggedIn() || ($_SESSION['role'] !== 'user' && $_SESSION['role'] !== 'admin')) {
+    header("Location: menu_fotos.php"); // Redirigir a menú de fotos si no tiene permiso
+    exit();
+}
+
 include 'includes/header.php';
 ?>
 
@@ -43,7 +49,7 @@ include 'includes/header.php';
                                value="<?php echo isset($_GET['codigo']) ? htmlspecialchars($_GET['codigo']) : ''; ?>">
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label for="nombre" class="form-label">Descripcion del Producto *</label>
+                        <label for="nombre" class="form-label">Descripción del Producto *</label>
                         <input type="text" class="form-control" id="nombre" name="nombre" 
                                placeholder="Ej: Gorra Nike Sportswear Heritage86" required
                                maxlength="38"

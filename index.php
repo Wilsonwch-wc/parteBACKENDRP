@@ -4,7 +4,7 @@ checkPermission();
 include 'includes/header.php';
 
 if ($_SESSION['role'] == 'admin') {
-    header("Location: admin.php");
+    header("Location: menu_fotos.php");
 } elseif ($_SESSION['role'] == 'usuario') {
     header("Location: menu_fotos.php");
 } else {
