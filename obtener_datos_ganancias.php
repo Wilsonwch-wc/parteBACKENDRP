@@ -1,73 +1,59 @@
 <?php
+error_reporting(0); // Desactivar reporte de errores
 require_once 'db.php';
-checkPermission('admin');
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 $conn = getDB();
 if (!$conn) {
-    die(json_encode(['error' => 'Error de conexión con la base de datos']));
+    die(json_encode(['error' => 'Error de conexión']));
 }
 
-$vista = $_GET['vista'] ?? 'mes';
-$desde = $_GET['desde'] ?? date('Y-m-d', strtotime('-1 year'));
-$hasta = $_GET['hasta'] ?? date('Y-m-d');
+try {
+    $vista = $_GET['vista'] ?? 'mes';
+    $desde = $_GET['desde'] ?? date('Y-m-01'); // Primer día del mes actual
+    $hasta = $_GET['hasta'] ?? date('Y-m-d');  // Hoy
 
-$format = '';
-$groupBy = '';
-$dateFormat = '';
+    $sql = "SELECT 
+                DATE(fecha) as fecha,
+                SUM(total) as ingresos,
+                SUM(cantidad * precio_compra) as gastos,
+                SUM(total - (cantidad * precio_compra)) as ganancias
+            FROM ventas v
+            JOIN productos p ON v.producto_id = p.id
+            WHERE fecha BETWEEN ? AND ?
+            GROUP BY DATE(fecha)
+            ORDER BY fecha";
 
-switch($vista) {
-    case 'dia':
-        $format = '%Y-%m-%d';
-        $groupBy = 'DATE(fecha_venta)';
-        $dateFormat = 'd/m/Y';
-        break;
-    case 'mes':
-        $format = '%Y-%m';
-        $groupBy = 'DATE_FORMAT(fecha_venta, "%Y-%m")';
-        $dateFormat = 'M Y';
-        break;
-    case 'año':
-        $format = '%Y';
-        $groupBy = 'YEAR(fecha_venta)';
-        $dateFormat = 'Y';
-        break;
-}
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ss", $desde, $hasta);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-$sql = "SELECT 
-            DATE_FORMAT(fecha_venta, '$format') as periodo,
-            SUM(cantidad * precio_compra) as total_gastos,
-            SUM(total) as total_ventas,
-            SUM(total - (cantidad * precio_compra)) as ganancia_neta
-        FROM ventas 
-        WHERE fecha_venta BETWEEN ? AND ?
-        GROUP BY $groupBy
-        ORDER BY periodo ASC";
+    $labels = [];
+    $gastos = [];
+    $ganancias = [];
 
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("ss", $desde, $hasta);
-$stmt->execute();
-$result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $labels[] = date('d/m/Y', strtotime($row['fecha']));
+        $gastos[] = floatval(round($row['gastos'], 2));
+        $ganancias[] = floatval(round($row['ganancias'], 2));
+    }
 
-$labels = [];
-$gastos = [];
-$ganancias = [];
+    // Si no hay datos, proporcionar datos vacíos
+    if (empty($labels)) {
+        $labels = [date('d/m/Y')];
+        $gastos = [0];
+        $ganancias = [0];
+    }
 
-while($row = $result->fetch_assoc()) {
-    $fecha = $vista === 'mes' ? 
-        date($dateFormat, strtotime($row['periodo'] . '-01')) : 
-        date($dateFormat, strtotime($row['periodo']));
-        
-    $labels[] = $fecha;
-    $gastos[] = round(floatval($row['total_gastos']), 2);
-    $ganancias[] = round(floatval($row['ganancia_neta']), 2);
+    echo json_encode([
+        'labels' => $labels,
+        'gastos' => $gastos,
+        'ganancias' => $ganancias
+    ]);
+} catch (Exception $e) {
+    echo json_encode(['error' => 'Error en el servidor']);
 }
 
 $conn->close();
-
-echo json_encode([
-    'labels' => $labels,
-    'gastos' => $gastos,
-    'ganancias' => $ganancias
-]);
 ?> 

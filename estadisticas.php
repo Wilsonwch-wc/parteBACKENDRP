@@ -9,198 +9,171 @@ if (!$conn) {
 }
 ?>
 
-<head>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/material_blue.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-
 <div class="container mt-4">
-    <h2>Estadísticas</h2>
-
-    <?php
-    if ($conn->connect_error) {
-        ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            Error al cargar estadísticas: <?php echo $conn->connect_error; ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        <?php
-    }
-
-    // Función para obtener estadísticas
-    function getStats($conn, $dateCondition) {
-        $sql = "SELECT COUNT(*) as total_ventas, COALESCE(SUM(total), 0) as ingreso_total 
-                FROM ventas 
-                WHERE " . $dateCondition;
-        $result = $conn->query($sql);
-        return $result->fetch_assoc();
-    }
-
-    // Estadísticas de hoy
-    $hoy = getStats($conn, "DATE(fecha_venta) = CURDATE()");
-    
-    // Estadísticas de la semana
-    $semana = getStats($conn, "YEARWEEK(fecha_venta) = YEARWEEK(CURDATE())");
-    
-    // Estadísticas del mes
-    $mes = getStats($conn, "YEAR(fecha_venta) = YEAR(CURDATE()) AND MONTH(fecha_venta) = MONTH(CURDATE())");
-    ?>
-
-    <div class="row mt-4">
-        <!-- Ventas de Hoy -->
-        <div class="col-md-4 mb-4">
-            <div class="card bg-primary text-white h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Ventas de Hoy</h5>
-                </div>
-                <div class="card-body">
-                    <h3 class="card-title"><?php echo $hoy['total_ventas']; ?> ventas</h3>
-                    <p class="card-text">
-                        Ingreso: $<?php echo number_format($hoy['ingreso_total'], 2); ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ventas de la Semana -->
-        <div class="col-md-4 mb-4">
-            <div class="card bg-success text-white h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Ventas de la Semana</h5>
-                </div>
-                <div class="card-body">
-                    <h3 class="card-title"><?php echo $semana['total_ventas']; ?> ventas</h3>
-                    <p class="card-text">
-                        Ingreso: $<?php echo number_format($semana['ingreso_total'], 2); ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ventas del Mes -->
-        <div class="col-md-4 mb-4">
-            <div class="card bg-info text-white h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">Ventas del Mes</h5>
-                </div>
-                <div class="card-body">
-                    <h3 class="card-title"><?php echo $mes['total_ventas']; ?> ventas</h3>
-                    <p class="card-text">
-                        Ingreso: $<?php echo number_format($mes['ingreso_total'], 2); ?>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Gráficos y estadísticas adicionales -->
-    <div class="row mt-4">
-        <div class="col-12 mb-4">
-            <div class="card">
-                <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Ventas e Ingresos</h5>
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-outline-primary " onclick="cambiarVista('dia')">Por Día</button>
-                            <button type="button" class="btn btn-outline-primary active" onclick="cambiarVista('mes')">Por Mes</button>
-                            <button type="button" class="btn btn-outline-primary" onclick="cambiarVista('año')">Por Año</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <label class="form-label">Desde</label>
-                                <input type="text" class="form-control flatpickr" id="fecha_desde" 
-                                       value="<?php echo date('Y-m-d', strtotime('-1 year')); ?>">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Hasta</label>
-                                <input type="text" class="form-control flatpickr" id="fecha_hasta" 
-                                       value="<?php echo date('Y-m-d', strtotime('+2 day')); ?>">
-                            </div>
-                        </div>
-                    </div>
-                    <div style="position: relative; height: 60vh; min-height: 400px;">
-                        <canvas id="ventasChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Nuevo gráfico de Gastos y Ganancias -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="mb-0">Análisis de Gastos y Ganancias</h5>
-        </div>
-        <div class="card-body">
-            <div class="mb-3">
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-outline-primary" onclick="cambiarVistaGanancias('dia')">Por Día</button>
-                    <button type="button" class="btn btn-outline-primary active" onclick="cambiarVistaGanancias('mes')">Por Mes</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="cambiarVistaGanancias('año')">Por Año</button>
-                </div>
-            </div>
-            <div style="height: 400px;">
-                <canvas id="gananciasChart"></canvas>
-            </div>
-        </div>
-    </div>
 
     <!-- Productos con Stock Bajo -->
-    <div class="row mt-4">
-        <div class="col-12 mb-4">
-            <div class="card">
-                <div class="card-header bg-warning">
-                    <h5 class="mb-0">Productos con Stock Bajo</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Producto</th>
-                                    <th>Stock Actual</th>
-                                    <th>Precio</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                // Consideramos stock bajo menos de 5 unidades
-                                $sql = "SELECT nombre, stock, precio 
-                                       FROM productos 
-                                       WHERE stock < 51 
-                                       ORDER BY stock ASC";
-                                $result = $conn->query($sql);
-                                
-                                if ($result->num_rows > 0) {
-                                    while($row = $result->fetch_assoc()) {
-                                        ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($row['nombre']); ?></td>
-                                            <td>
-                                                <span class="badge bg-<?php echo $row['stock'] == 0 ? 'danger' : 'warning'; ?>">
-                                                    <?php echo $row['stock']; ?> unidades
-                                                </span>
-                                            </td>
-                                            <td>$<?php echo number_format($row['precio'], 2); ?></td>
-                                        </tr>
-                                        <?php
-                                    }
-                                } else {
-                                    echo '<tr><td colspan="3" class="text-center text-success">
-                                            No hay productos con stock bajo
-                                          </td></tr>';
-                                }
-                                ?>
-                            </tbody>
-                        </table>
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">Productos con Stock Bajo (Menos de 50 unidades)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Stock Actual</th>
+                            <th>Categoría</th>
+                            <th>Precio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockBajoBody">
+                        <!-- Se llenará dinámicamente -->
+                    </tbody>
+                </table>
+                
+                <!-- Paginación para Stock Bajo -->
+                <div id="paginacionStockBajoContainer" class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="text-muted" id="paginacionStockBajoInfo">
+                        <!-- Información de paginación se llenará dinámicamente -->
                     </div>
+                    
+                    <nav aria-label="Navegación de productos con stock bajo">
+                        <ul class="pagination mb-0" id="paginacionStockBajo">
+                            <!-- Paginación se llenará dinámicamente -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resto de las estadísticas -->
+    <div class="row">
+        <!-- Ventas Totales -->
+        <div class="col-md-4 mb-4">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Ingresos Totales</h5>
+                    <?php
+                    $sql = "SELECT SUM(total) as total FROM ventas_cabecera";
+                    $result = $conn->query($sql);
+                    $total = $result->fetch_assoc()['total'] ?? 0;
+                    ?>
+                    <h3 class="card-text">$<?php echo number_format($total, 0, ',', '.'); ?></h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos Vendidos -->
+        <div class="col-md-4 mb-4">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Productos Vendidos</h5>
+                    <?php
+                    $sql = "SELECT SUM(cantidad) as total FROM ventas";
+                    $result = $conn->query($sql);
+                    $total = $result->fetch_assoc()['total'] ?? 0;
+                    ?>
+                    <h3 class="card-text"><?php echo number_format($total, 0, ',', '.'); ?></h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos en Stock -->
+        <div class="col-md-4 mb-4">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Productos en Stock</h5>
+                    <?php
+                    $sql = "SELECT SUM(stock) as total FROM productos";
+                    $result = $conn->query($sql);
+                    $total = $result->fetch_assoc()['total'] ?? 0;
+                    ?>
+                    <h3 class="card-text"><?php echo number_format($total, 0, ',', '.'); ?></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productos Más Vendidos -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Productos Más Vendidos (Top 10)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Cantidad Vendida</th>
+                            <th>Total Ventas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $sql = "SELECT p.codigo, p.nombre, SUM(v.cantidad) as cantidad_vendida, 
+                                SUM(v.total) as total_ventas 
+                                FROM ventas v 
+                                JOIN productos p ON v.producto_id = p.id 
+                                GROUP BY v.producto_id 
+                                ORDER BY cantidad_vendida DESC 
+                                LIMIT 10";
+                        $result = $conn->query($sql);
+                        
+                        while($row = $result->fetch_assoc()) {
+                            echo "<tr>
+                                    <td>{$row['codigo']}</td>
+                                    <td>{$row['nombre']}</td>
+                                    <td>{$row['cantidad_vendida']}</td>
+                                    <td>$" . number_format($row['total_ventas'], 0, ',', '.') . "</td>
+                                </tr>";
+                        }
+                        ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productos Menos Vendidos -->
+    <div class="card mt-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0">Productos Menos Vendidos (5 o menos ventas)</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Vendidos</th>
+                            <th>Stock</th>
+                            <th>Días en Inventario</th>
+                            <th>Ventas/Día</th>
+                            <th>Capital Estancado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="menosVendidosBody">
+                        <!-- Se llenará dinámicamente -->
+                    </tbody>
+                </table>
+                
+                <!-- Paginación -->
+                <div id="paginacionContainer" class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="text-muted" id="paginacionInfo">
+                        <!-- Información de paginación se llenará dinámicamente -->
+                    </div>
+                    
+                    <nav aria-label="Navegación de productos menos vendidos">
+                        <ul class="pagination mb-0" id="paginacionMenosVendidos">
+                            <!-- Paginación se llenará dinámicamente -->
+                        </ul>
+                    </nav>
                 </div>
             </div>
         </div>
@@ -208,199 +181,402 @@ if (!$conn) {
 </div>
 
 <script>
-let vistaActual = 'mes';
-let chartInstance = null;
+let paginaActualStockBajo = 1;
+let paginaActualMenosVendidos = 1;
+const registrosPorPagina = 10;
 
-function cambiarVista(vista) {
-    vistaActual = vista;
-    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    actualizarGrafico();
-}
-
-function actualizarGrafico() {
-    const desde = document.getElementById('fecha_desde').value;
-    const hasta = document.getElementById('fecha_hasta').value;
+function cargarProductosStockBajo(pagina = 1) {
+    paginaActualStockBajo = pagina;
     
-    fetch(`obtener_datos_grafico.php?vista=${vistaActual}&desde=${desde}&hasta=${hasta}`)
+    // Mostrar indicador de carga
+    document.getElementById('stockBajoBody').innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center py-3">
+                <div class="spinner-border text-warning" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+    
+    // Obtener posición actual de scroll si es necesario
+    const scrollPosition = window.scrollY;
+    
+    fetch(`get_stock_bajo.php?pagina=${pagina}&limit=${registrosPorPagina}`)
         .then(response => response.json())
         .then(data => {
-            if (chartInstance) {
-                chartInstance.destroy();
+            const tbody = document.getElementById('stockBajoBody');
+            tbody.innerHTML = '';
+            
+            if (data.productos.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-3">
+                            No hay productos con stock bajo
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('paginacionStockBajoContainer').style.display = 'none';
+                return;
             }
             
-            const ctx = document.getElementById('ventasChart').getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        {
-                            label: 'Cantidad de Ventas',
-                            data: data.ventas,
-                            backgroundColor: 'rgba(76, 175, 80, 0.6)',
-                            borderColor: '#4CAF50',
-                            borderWidth: 1,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Ingresos ($)',
-                            data: data.ingresos,
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                            borderColor: 'rgb(54, 162, 235)',
-                            borderWidth: 1,
-                            type: 'line',
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        },
-                        title: {
-                            display: true,
-                            text: 'Cantidad de Ventas e Ingresos por Período'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            title: {
-                                display: true,
-                                text: 'Período'
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            beginAtZero: true,
-                            grid: {
-                                borderDash: [2, 2]
-                            },
-                            title: {
-                                display: true,
-                                text: 'Cantidad de Ventas'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            beginAtZero: true,
-                            grid: {
-                                drawOnChartArea: false,
-                            },
-                            title: {
-                                display: true,
-                                text: 'Ingresos ($)'
-                            }
-                        }
-                    }
-                }
+            data.productos.forEach(producto => {
+                const stockClass = producto.stock == 0 ? 'table-danger' : 'table-warning';
+                const tr = document.createElement('tr');
+                tr.className = stockClass;
+                tr.innerHTML = `
+                    <td>${producto.codigo}</td>
+                    <td>${producto.nombre}</td>
+                    <td>${producto.stock}</td>
+                    <td>${producto.categoria}</td>
+                    <td>$${producto.precio}</td>
+                `;
+                tbody.appendChild(tr);
             });
+            
+            // Actualizar información de paginación
+            document.getElementById('paginacionStockBajoInfo').textContent = 
+                `Mostrando ${(data.paginacion.pagina_actual - 1) * data.paginacion.por_pagina + 1}-` +
+                `${Math.min(data.paginacion.pagina_actual * data.paginacion.por_pagina, data.paginacion.total)} ` +
+                `de ${data.paginacion.total} productos`;
+            
+            // Generar controles de paginación
+            generarPaginacionStockBajo(data.paginacion);
+            
+            // Mostrar contenedor de paginación
+            document.getElementById('paginacionStockBajoContainer').style.display = 'flex';
+            
+            // Mantener posición de scroll si no es la primera carga
+            if (pagina > 1) {
+                window.scrollTo(0, scrollPosition);
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar productos con stock bajo:', error);
+            document.getElementById('stockBajoBody').innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-3 text-danger">
+                        Error al cargar datos. Intente nuevamente.
+                    </td>
+                </tr>
+            `;
         });
 }
 
-// Inicializar Flatpickr
-flatpickr(".flatpickr", {
-    locale: "es",
-    dateFormat: "Y-m-d",
-    altFormat: "d/m/Y",
-    altInput: true,
-    allowInput: true,
-    theme: "material_blue",
-    onChange: function(selectedDates, dateStr) {
-        actualizarGrafico();
+function generarPaginacionStockBajo(paginacion) {
+    const ulPaginacion = document.getElementById('paginacionStockBajo');
+    ulPaginacion.innerHTML = '';
+    
+    // Botón anterior
+    if (paginacion.pagina_actual > 1) {
+        const liAnterior = document.createElement('li');
+        liAnterior.className = 'page-item';
+        liAnterior.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosStockBajo(${paginacion.pagina_actual - 1}); return false;">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        `;
+        ulPaginacion.appendChild(liAnterior);
     }
-});
-
-// Inicializar gráfico al cargar la página
-document.addEventListener('DOMContentLoaded', actualizarGrafico);
-
-let vistaActualGanancias = 'mes';
-let chartGanancias = null;
-
-function cambiarVistaGanancias(vista) {
-    vistaActualGanancias = vista;
-    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
-    actualizarGraficoGanancias();
+    
+    // Páginas
+    const rangoInicio = Math.max(1, paginacion.pagina_actual - 2);
+    const rangoFin = Math.min(paginacion.total_paginas, paginacion.pagina_actual + 2);
+    
+    // Primera página y ellipsis
+    if (rangoInicio > 1) {
+        const liPrimera = document.createElement('li');
+        liPrimera.className = 'page-item';
+        liPrimera.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosStockBajo(1); return false;">1</a>
+        `;
+        ulPaginacion.appendChild(liPrimera);
+        
+        if (rangoInicio > 2) {
+            const liEllipsis = document.createElement('li');
+            liEllipsis.className = 'page-item disabled';
+            liEllipsis.innerHTML = '<span class="page-link">...</span>';
+            ulPaginacion.appendChild(liEllipsis);
+        }
+    }
+    
+    // Páginas del rango
+    for (let i = rangoInicio; i <= rangoFin; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === paginacion.pagina_actual ? 'active' : ''}`;
+        li.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosStockBajo(${i}); return false;">${i}</a>
+        `;
+        ulPaginacion.appendChild(li);
+    }
+    
+    // Última página y ellipsis
+    if (rangoFin < paginacion.total_paginas) {
+        if (rangoFin < paginacion.total_paginas - 1) {
+            const liEllipsis = document.createElement('li');
+            liEllipsis.className = 'page-item disabled';
+            liEllipsis.innerHTML = '<span class="page-link">...</span>';
+            ulPaginacion.appendChild(liEllipsis);
+        }
+        
+        const liUltima = document.createElement('li');
+        liUltima.className = 'page-item';
+        liUltima.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosStockBajo(${paginacion.total_paginas}); return false;">${paginacion.total_paginas}</a>
+        `;
+        ulPaginacion.appendChild(liUltima);
+    }
+    
+    // Botón siguiente
+    if (paginacion.pagina_actual < paginacion.total_paginas) {
+        const liSiguiente = document.createElement('li');
+        liSiguiente.className = 'page-item';
+        liSiguiente.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosStockBajo(${paginacion.pagina_actual + 1}); return false;">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        `;
+        ulPaginacion.appendChild(liSiguiente);
+    }
 }
 
-function actualizarGraficoGanancias() {
-    const desde = document.getElementById('fecha_desde').value;
-    const hasta = document.getElementById('fecha_hasta').value;
+function cargarProductosMenosVendidos(pagina = 1) {
+    paginaActualMenosVendidos = pagina;
     
-    fetch(`obtener_datos_ganancias.php?vista=${vistaActualGanancias}&desde=${desde}&hasta=${hasta}`)
+    // Mostrar indicador de carga
+    document.getElementById('menosVendidosBody').innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center py-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+            </td>
+        </tr>
+    `;
+    
+    // Obtener posición actual de scroll si es necesario
+    const scrollPosition = window.scrollY;
+    
+    fetch(`get_menos_vendidos.php?pagina=${pagina}&limit=${registrosPorPagina}`)
         .then(response => response.json())
         .then(data => {
-            if (chartGanancias) {
-                chartGanancias.destroy();
+            const tbody = document.getElementById('menosVendidosBody');
+            tbody.innerHTML = '';
+            
+            if (data.productos.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-3">
+                            No se encontraron productos con 5 o menos ventas
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('paginacionContainer').style.display = 'none';
+                return;
             }
             
-            const ctx = document.getElementById('gananciasChart').getContext('2d');
-            chartGanancias = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.labels,
-                    datasets: [
-                        {
-                            label: 'Gastos',
-                            data: data.gastos,
-                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                            borderColor: 'rgb(255, 99, 132)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Ganancias',
-                            data: data.ganancias,
-                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                            borderColor: 'rgb(75, 192, 192)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            stacked: true,
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y: {
-                            stacked: true,
-                            beginAtZero: true,
-                            grid: {
-                                borderDash: [2, 2]
-                            }
-                        }
-                    }
-                }
+            data.productos.forEach(producto => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${producto.codigo}</td>
+                    <td>${producto.nombre}</td>
+                    <td class="text-danger">${producto.vendido}</td>
+                    <td>${producto.stock_actual}</td>
+                    <td>${producto.dias_inventario}</td>
+                    <td>${producto.ventas_por_dia}</td>
+                    <td class="text-danger">$${producto.dinero_estancado}</td>
+                </tr>`;
+                tbody.appendChild(tr);
             });
+            
+            // Actualizar información de paginación
+            document.getElementById('paginacionInfo').textContent = 
+                `Mostrando ${(data.paginacion.pagina_actual - 1) * data.paginacion.por_pagina + 1}-` +
+                `${Math.min(data.paginacion.pagina_actual * data.paginacion.por_pagina, data.paginacion.total)} ` +
+                `de ${data.paginacion.total} productos`;
+            
+            // Generar controles de paginación
+            generarPaginacion(data.paginacion);
+            
+            // Mostrar contenedor de paginación
+            document.getElementById('paginacionContainer').style.display = 'flex';
+            
+            // Mantener posición de scroll si no es la primera carga
+            if (pagina > 1) {
+                window.scrollTo(0, scrollPosition);
+            }
+        })
+        .catch(error => {
+            console.error('Error al cargar productos menos vendidos:', error);
+            document.getElementById('menosVendidosBody').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-3 text-danger">
+                        Error al cargar datos. Intente nuevamente.
+                    </td>
+                </tr>
+            `;
         });
 }
 
-// Inicializar gráfico de ganancias al cargar la página
+function generarPaginacion(paginacion) {
+    const ulPaginacion = document.getElementById('paginacionMenosVendidos');
+    ulPaginacion.innerHTML = '';
+    
+    // Botón anterior
+    if (paginacion.pagina_actual > 1) {
+        const liAnterior = document.createElement('li');
+        liAnterior.className = 'page-item';
+        liAnterior.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosMenosVendidos(${paginacion.pagina_actual - 1}); return false;">
+                <span aria-hidden="true">&laquo;</span>
+            </a>
+        `;
+        ulPaginacion.appendChild(liAnterior);
+    }
+    
+    // Páginas
+    const rangoInicio = Math.max(1, paginacion.pagina_actual - 2);
+    const rangoFin = Math.min(paginacion.total_paginas, paginacion.pagina_actual + 2);
+    
+    // Primera página y ellipsis
+    if (rangoInicio > 1) {
+        const liPrimera = document.createElement('li');
+        liPrimera.className = 'page-item';
+        liPrimera.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosMenosVendidos(1); return false;">1</a>
+        `;
+        ulPaginacion.appendChild(liPrimera);
+        
+        if (rangoInicio > 2) {
+            const liEllipsis = document.createElement('li');
+            liEllipsis.className = 'page-item disabled';
+            liEllipsis.innerHTML = '<span class="page-link">...</span>';
+            ulPaginacion.appendChild(liEllipsis);
+        }
+    }
+    
+    // Páginas del rango
+    for (let i = rangoInicio; i <= rangoFin; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === paginacion.pagina_actual ? 'active' : ''}`;
+        li.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosMenosVendidos(${i}); return false;">${i}</a>
+        `;
+        ulPaginacion.appendChild(li);
+    }
+    
+    // Última página y ellipsis
+    if (rangoFin < paginacion.total_paginas) {
+        if (rangoFin < paginacion.total_paginas - 1) {
+            const liEllipsis = document.createElement('li');
+            liEllipsis.className = 'page-item disabled';
+            liEllipsis.innerHTML = '<span class="page-link">...</span>';
+            ulPaginacion.appendChild(liEllipsis);
+        }
+        
+        const liUltima = document.createElement('li');
+        liUltima.className = 'page-item';
+        liUltima.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosMenosVendidos(${paginacion.total_paginas}); return false;">${paginacion.total_paginas}</a>
+        `;
+        ulPaginacion.appendChild(liUltima);
+    }
+    
+    // Botón siguiente
+    if (paginacion.pagina_actual < paginacion.total_paginas) {
+        const liSiguiente = document.createElement('li');
+        liSiguiente.className = 'page-item';
+        liSiguiente.innerHTML = `
+            <a class="page-link" href="#" onclick="cargarProductosMenosVendidos(${paginacion.pagina_actual + 1}); return false;">
+                <span aria-hidden="true">&raquo;</span>
+            </a>
+        `;
+        ulPaginacion.appendChild(liSiguiente);
+    }
+}
+
+// Cargar datos cuando la página esté lista
 document.addEventListener('DOMContentLoaded', function() {
-    actualizarGrafico();
-    actualizarGraficoGanancias();
+    cargarProductosStockBajo();
+    cargarProductosMenosVendidos();
 });
 </script>
+
+<style>
+/* Estilos para la tabla de menos vendidos */
+#menosVendidosBody tr:hover {
+    background-color: #fff3f3;
+}
+
+[data-theme="dark"] #menosVendidosBody tr:hover {
+    background-color: #3a2a2a;
+}
+
+/* Estilos para la tabla de stock bajo */
+#stockBajoBody tr:hover {
+    background-color: #fff9e6;
+}
+
+[data-theme="dark"] #stockBajoBody tr:hover {
+    background-color: #3a3522;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.text-danger {
+    font-weight: 500;
+}
+
+/* Estilos para la paginación de productos menos vendidos */
+#paginacionMenosVendidos .page-link {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+#paginacionMenosVendidos .page-item.active .page-link {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+[data-theme="dark"] #paginacionMenosVendidos .page-link {
+    background-color: #343a40;
+    color: #dc3545;
+    border-color: #495057;
+}
+
+[data-theme="dark"] #paginacionMenosVendidos .page-item.active .page-link {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+/* Estilos para la paginación de productos con stock bajo */
+#paginacionStockBajo .page-link {
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+#paginacionStockBajo .page-item.active .page-link {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+[data-theme="dark"] #paginacionStockBajo .page-link {
+    background-color: #343a40;
+    color: #ffc107;
+    border-color: #495057;
+}
+
+[data-theme="dark"] #paginacionStockBajo .page-item.active .page-link {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+</style>
 
 <?php 
 $conn->close();

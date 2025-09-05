@@ -8,38 +8,37 @@ if (isset($_GET['id'])) {
         die("Error de conexión con la base de datos");
     }
     
-    // Iniciar transacción
     $conn->begin_transaction();
     
     try {
-        // Obtener todas las ventas del mismo pedido (mismo timestamp)
-        $stmt = $conn->prepare("
-            SELECT v2.id, v2.producto_id, v2.cantidad 
-            FROM ventas v1 
-            JOIN ventas v2 ON DATE_FORMAT(v1.fecha_venta, '%Y-%m-%d %H:%i:%s') = 
-                            DATE_FORMAT(v2.fecha_venta, '%Y-%m-%d %H:%i:%s')
-            WHERE v1.id = ?");
+        // Obtener todas las ventas de la transacción
+        $stmt = $conn->prepare("SELECT producto_id, cantidad FROM ventas WHERE transaccion_id = ?");
         $stmt->bind_param("i", $_GET['id']);
         $stmt->execute();
         $result = $stmt->get_result();
         
+        // Restaurar stock de todos los productos
         while ($venta = $result->fetch_assoc()) {
-            // Restaurar el stock de cada producto
             $stmt = $conn->prepare("UPDATE productos SET stock = stock + ? WHERE id = ?");
             $stmt->bind_param("ii", $venta['cantidad'], $venta['producto_id']);
             $stmt->execute();
-            
-            // Eliminar cada venta
-            $stmt = $conn->prepare("DELETE FROM ventas WHERE id = ?");
-            $stmt->bind_param("i", $venta['id']);
-            $stmt->execute();
         }
         
+        // Eliminar todas las ventas de la transacción
+        $stmt = $conn->prepare("DELETE FROM ventas WHERE transaccion_id = ?");
+        $stmt->bind_param("i", $_GET['id']);
+        $stmt->execute();
+        
+        // Eliminar la cabecera de la venta
+        $stmt = $conn->prepare("DELETE FROM ventas_cabecera WHERE id = ?");
+        $stmt->bind_param("i", $_GET['id']);
+        $stmt->execute();
+        
         $conn->commit();
-        header("Location: historial.php?success=Venta deshecha correctamente");
+        header("Location: historial.php?success=Venta eliminada correctamente");
     } catch (Exception $e) {
         $conn->rollback();
-        header("Location: historial.php?error=No se pudo deshacer la venta");
+        header("Location: historial.php?error=" . urlencode($e->getMessage()));
     }
     
     $conn->close();

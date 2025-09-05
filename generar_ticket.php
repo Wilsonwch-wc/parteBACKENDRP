@@ -1,60 +1,96 @@
 <?php
 require_once 'db.php';
-checkPermission();
 
-if (isset($_GET['pedido_id'])) {
-    $pedidoId = $_GET['pedido_id'];
-    $metodoPago = $_GET['metodo_pago'] ?? 'Desconocido';
+// Establecer la zona horaria de Argentina
+date_default_timezone_set('America/Argentina/Buenos_Aires');
+
+if (isset($_GET['transaccion_id'])) {
+    $transaccionId = $_GET['transaccion_id'];
     $conn = getDB();
-    
+
     if ($conn->connect_error) {
         die("Error: Connection failed.");
     }
-    
-    // Obtener la fecha exacta de la venta
-    $sql = "SELECT fecha_venta FROM ventas WHERE id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $pedidoId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $fechaVenta = $result->fetch_assoc()['fecha_venta'];
-    
-    // Buscar productos por la misma fecha exacta
-    $sql = "SELECT v.*, p.nombre, p.codigo FROM ventas v 
+
+    $sql = "SELECT v.*, p.nombre, p.codigo, vc.metodo_pago, vc.costo_envio, vc.iva, vc.iva21 
+            FROM ventas v 
             JOIN productos p ON v.producto_id = p.id 
-            WHERE v.fecha_venta = ?";
+            JOIN ventas_cabecera vc ON v.transaccion_id = vc.id
+            WHERE v.transaccion_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $fechaVenta);
+    $stmt->bind_param("i", $transaccionId);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     $carrito = [];
-    $fecha = '';
+    $metodoPago = '';
+    $costoEnvio = 0;
+    $incluirIVA = false;
+    $incluirIVA21 = false;
+
     while ($row = $result->fetch_assoc()) {
-        $iva = $row['iva'] == 1 ? '21%' : '-';
         $carrito[] = [
             'codigo' => $row['codigo'],
             'nombre' => $row['nombre'],
             'cantidad' => $row['cantidad'],
             'precio' => $row['precio_unitario'],
-            'iva' => $iva,
             'total' => $row['total']
         ];
-        $fecha = date('d/m/Y H:i:s', strtotime($row['fecha_venta']));
+        $metodoPago = $row['metodo_pago'];
+        $costoEnvio = $row['costo_envio'] ?? 0;
+        $incluirIVA = $row['iva'] == 1;
+        $incluirIVA21 = $row['iva21'] == 1;
     }
     
     $conn->close();
-} else {
-    $datos = json_decode(file_get_contents('php://input'), true);
-    $carrito = $datos['items'];
-    $metodoPago = $datos['metodoPago'];
-    $fecha = date('d/m/Y H:i:s');
-
-    // Verificar que los datos se recibieron correctamente
-    if (!$carrito || !$metodoPago) {
+} else if (isset($_POST['ticketData'])) {
+    $datos = json_decode($_POST['ticketData'], true);
+    if (!$datos) {
         echo "Error: Datos incompletos.";
         exit;
     }
+    $carrito = $datos['items'];
+    $metodoPago = $datos['metodoPago'];
+    $costoEnvio = isset($datos['envio']) ? floatval($datos['envio']) : 0;
+    $incluirIVA = isset($datos['incluirIVA']) ? $datos['incluirIVA'] : false;
+    $incluirIVA21 = isset($datos['incluirIVA21']) ? $datos['incluirIVA21'] : false;
+} else {
+    $datos = json_decode(file_get_contents('php://input'), true);
+    if (!$datos) {
+        echo "Error: Datos incompletos.";
+        exit;
+    }
+    $carrito = $datos['items'];
+    $metodoPago = $datos['metodoPago'];
+    $costoEnvio = isset($datos['envio']) ? floatval($datos['envio']) : 0;
+    $incluirIVA = isset($datos['incluirIVA']) ? $datos['incluirIVA'] : false;
+    $incluirIVA21 = isset($datos['incluirIVA21']) ? $datos['incluirIVA21'] : false;
+}
+
+// Siempre usar la fecha y hora actual del servidor con zona horaria de Argentina
+$fecha = date('d/m/Y H:i:s');
+$transaccionId = isset($_GET['transaccion_id']) ? $_GET['transaccion_id'] : 'OFFLINE';
+
+$totalItems = 0;
+$totalGeneral = 0;
+$ivaTotal = 0;
+$iva21Total = 0;
+
+foreach ($carrito as $item) {
+    $totalItems += $item['cantidad'];
+    $totalGeneral += $item['total'];
+}
+
+// Guardar el total sin impuestos para el cálculo correcto
+$subTotal = $totalGeneral;
+
+// Calcular recargo e IVA si están marcados
+if ($incluirIVA) {
+    $ivaTotal = $subTotal * 0.035;
+}
+
+if ($incluirIVA21) {
+    $iva21Total = $subTotal * 0.21;
 }
 ?>
 <!DOCTYPE html>
@@ -62,17 +98,18 @@ if (isset($_GET['pedido_id'])) {
 <head>
     <meta charset="UTF-8">
     <title>Ticket de Venta</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         @page {
             margin: 0;
             size: 80mm 297mm;
         }
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Space Mono', monospace;
             width: 80mm;
             margin: 0;
             padding: 5mm;
-            font-size: 12px;
+            font-size: 11px;
         }
         table {
             width: 100%;
@@ -86,7 +123,7 @@ if (isset($_GET['pedido_id'])) {
         }
         .total {
             text-align: left;
-            margin-top: 5px;
+            margin-top: 20px;
             padding-top: 5px;
             border-top: 1px dashed #000;
         }
@@ -101,61 +138,77 @@ if (isset($_GET['pedido_id'])) {
         @media print {
             .no-print { display: none; }
         }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .item-row {
+            font-size: 10px;
+            line-height: 1.4;
+        }
+        .total {
+            font-size: 13px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <div style="text-align: center; margin-bottom: 10px;">
+    <div style="text-align: center; margin-bottom: 10px; font-size: 13px;">
         <strong>PUNTO CAPS</strong><br>
-        <strong>CAMPANA 255, L. 30</strong><br>
+        <strong>CAMPANA 255 FLORES L.30</strong><br>
         <strong>CATALOGO 1166445162 - 1166445164</strong><br>
         <strong><?php echo $fecha; ?></strong>
     </div>
+    
+    <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
+    
     <table>
         <thead>
             <tr>
                 <th><strong>Código</strong></th>
-                <th><strong>Descrip.</strong></th>
                 <th><strong>Un.</strong></th>
+                <th><strong>Descrip.</strong></th>
                 <th><strong>Precio</strong></th>
-                <th><strong>Iva</strong></th>
                 <th><strong>Total</strong></th>
             </tr>
         </thead>
         <tbody>
         <?php
-$totalItems = 0;
-$totalGeneral = 0;
-foreach ($carrito as $item) {
-    $totalItems += $item['cantidad'];
-    $totalGeneral += $item['total'];
-    ?>
-    <tr class="item-row">
-        <!-- Descripción ocupa toda la línea -->
-        <td colspan="6" style="font-weight: bold; text-align: left;">
-            <strong><?php echo htmlspecialchars($item['codigo']) . " - " . htmlspecialchars($item['nombre']); ?></strong>
-        </td>
-    </tr>
-    <!-- Segunda línea con los demás datos -->
-    <tr>
-        <td><?php echo ""; ?></td>
-        <td><?php echo ""; ?></td>
-        <td><strong><?php echo htmlspecialchars($item['cantidad']); ?></strong></td>
-        <td><strong><?php echo number_format($item['precio']); ?></strong></td>
-        <td><strong><?php echo htmlspecialchars($item['iva']); ?></strong></td>
-        <td><strong><?php echo number_format($item['total']); ?></strong></td>
-    </tr>
-<?php
-}
-?>
-
+        foreach ($carrito as $item) {
+            ?>
+            <tr class="item-row">
+                <td colspan="5" style="font-weight: bold; text-align: left;">
+                    <strong><?php echo htmlspecialchars($item['codigo']) . " - " . htmlspecialchars($item['nombre']); ?></strong>
+                </td>
+            </tr>
+            <tr>
+                <td><?php echo ""; ?></td>
+                <td><strong><?php echo htmlspecialchars($item['cantidad']); ?></strong></td>
+                <td><strong>$<?php echo number_format($item['precio'], 0); ?></strong></td>
+                <td><strong>$<?php echo number_format($item['precio'] * $item['cantidad'], 0); ?></strong></td>
+            </tr>
+            <?php
+        }
+        ?>
         </tbody>
     </table>
 
     <div class="total">
-        <div><strong># Pedido: <?php echo $pedidoId; ?></strong></div>
-        <div><strong>Total de items: <?php echo $totalItems; ?></strong></div>
-        <div><strong>Valor a pagar $ <?php echo number_format($totalGeneral, 2); ?></strong></div>
-        <div><strong>FORMA PAGO: <?php echo htmlspecialchars($metodoPago); ?></strong></div>
+        <div>Orden de Compra #<?php echo $transaccionId; ?></div>
+        <div>Total de item: <?php echo $totalItems; ?></div>
+        <div>Forma de Pago: <?php echo htmlspecialchars($metodoPago); ?></div>
+        <?php if ($incluirIVA): ?>
+        <div>transacción 3.5%: $<?php echo number_format($ivaTotal, 0); ?></div>
+        <?php endif; ?>
+        <?php if ($incluirIVA21): ?>
+        <div>IVA 21%: $<?php echo number_format($iva21Total, 0); ?></div>
+        <?php endif; ?>
+        <?php if ($costoEnvio > 0): ?>
+        <div>Cadete: $ <?php echo number_format($costoEnvio, 0); ?></div>
+        <?php endif; ?>
+        <div><strong>Valor total $ <?php echo number_format($subTotal + ($incluirIVA ? $ivaTotal : 0) + ($incluirIVA21 ? $iva21Total : 0) + $costoEnvio, 0); ?></strong></div>
     </div>
 
     <div class="no-print" style="margin-top:20px;text-align:center;">

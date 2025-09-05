@@ -7,41 +7,48 @@ if (isset($_GET['desde']) && isset($_GET['hasta'])) {
     if (!$conn) {
         die("Error de conexión con la base de datos");
     }
-
-    // Iniciar transacción
+    
     $conn->begin_transaction();
-
+    
     try {
-        // Obtener todas las ventas dentro del rango de fechas
-        $stmt = $conn->prepare("
-            SELECT id, producto_id, cantidad 
-            FROM ventas 
-            WHERE DATE(fecha_venta) BETWEEN ? AND ?");
-        $stmt->bind_param("ss", $_GET['desde'], $_GET['hasta']);
+        // Convertir las fechas al formato correcto
+        $desde = date('Y-m-d 00:00:00', strtotime($_GET['desde']));
+        $hasta = date('Y-m-d 23:59:59', strtotime($_GET['hasta']));
+        
+        // Obtener los IDs de las transacciones en el rango de fechas
+        $stmt = $conn->prepare("SELECT id FROM ventas_cabecera WHERE fecha_venta BETWEEN ? AND ?");
+        $stmt->bind_param("ss", $desde, $hasta);
         $stmt->execute();
         $result = $stmt->get_result();
-
-        while ($venta = $result->fetch_assoc()) {
-            // Restaurar el stock de cada producto
-            $stmt = $conn->prepare("UPDATE productos SET stock = stock + ? WHERE id = ?");
-            $stmt->bind_param("ii", $venta['cantidad'], $venta['producto_id']);
-            $stmt->execute();
-
-            // Eliminar cada venta
-            $stmt = $conn->prepare("DELETE FROM ventas WHERE id = ?");
-            $stmt->bind_param("i", $venta['id']);
-            $stmt->execute();
+        
+        $contadorEliminados = 0;
+        
+        while ($row = $result->fetch_assoc()) {
+            // Eliminar las ventas
+            $stmt4 = $conn->prepare("DELETE FROM ventas WHERE transaccion_id = ?");
+            $stmt4->bind_param("i", $row['id']);
+            $stmt4->execute();
+            
+            // Eliminar la cabecera
+            $stmt5 = $conn->prepare("DELETE FROM ventas_cabecera WHERE id = ?");
+            $stmt5->bind_param("i", $row['id']);
+            $stmt5->execute();
+            
+            $contadorEliminados++;
         }
-
+        
         $conn->commit();
-        header("Location: historial.php?success=Ventas eliminadas correctamente");
+        $mensaje = $contadorEliminados > 0 ? 
+                  "Se eliminaron $contadorEliminados transacciones correctamente" : 
+                  "No se encontraron ventas en el rango de fechas seleccionado";
+        header("Location: historial.php?success=" . urlencode($mensaje));
     } catch (Exception $e) {
         $conn->rollback();
-        header("Location: historial.php?error=No se pudieron eliminar las ventas");
+        header("Location: historial.php?error=" . urlencode($e->getMessage()));
     }
-
+    
     $conn->close();
 } else {
-    header("Location: historial.php?error=Fechas no válidas");
+    header("Location: historial.php?error=Debe seleccionar ambas fechas");
 }
 ?>
